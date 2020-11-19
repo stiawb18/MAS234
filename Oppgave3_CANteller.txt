@@ -1,0 +1,76 @@
+#include <FlexCAN.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SSD1306_LCDHEIGHT 64
+#include <Fonts/FreeMono9pt7b.h>
+#define OLED_DC     6
+#define OLED_CS     10
+#define OLED_RESET  5
+Adafruit_SSD1306 display(OLED_DC, OLED_RESET, OLED_CS);
+
+const int JOY_CLICK = 19; //definerer pin-nummer på klikk
+
+static CAN_message_t msg, mmsg;
+IntervalTimer TX_timer;
+
+//deklarasjon av tellevariabler.
+int sendt = 0;
+int mottatt = 0;
+
+void setup() {
+
+  //oppsett av grafikk som ikke skal oppdateres.
+  //Kun tall er nødvendig å oppdateres, resten av skjermen kan være statisk.
+  display.begin(SSD1306_SWITCHCAPVCC);
+  display.clearDisplay();
+  display.setTextSize(0);
+  display.setTextColor(WHITE);
+  display.drawRoundRect(1, 1, 126, 62, 4, WHITE);
+  display.setCursor(14, 7);
+  display.println("MAS 234 GRUPPE 13");
+  display.drawFastHLine(10, 15, 108, WHITE);
+  display.setCursor(12, 22);
+  display.println("CAN-BUS meldinger");
+  display.setCursor(7, 35);
+  display.println("Antall sendt:");
+  display.setCursor(7, 45);
+  display.println("Antall mottatt:");
+  display.display();
+
+  Can1.begin(500000);
+  TX_timer.begin(tx_CAN, 1000000);
+
+  pinMode(JOY_CLICK, INPUT_PULLUP); //kunfigurerer valgt pin som pullup.
+}
+void tx_CAN(void)
+{
+  msg.len = 1;
+  msg.id = 10;
+  msg.buf[0] = 20;
+}
+
+void loop() {
+  if (Can1.read(mmsg))
+  {
+    mottatt++;
+
+  }
+  else
+  {
+  }
+  if (digitalRead(JOY_CLICK) == LOW)
+  {
+    Can1.write(msg);
+    sendt++;
+    delay(300);
+  }
+
+  display.fillRect(110, 35, 15, 20, BLACK);
+  display.setCursor(110, 35);
+  display.println(sendt);
+  display.setCursor(110, 45);
+  display.println(mottatt);
+  display.display();
+}

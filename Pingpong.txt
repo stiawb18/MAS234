@@ -1,0 +1,340 @@
+#include <FlexCAN.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SSD1306_LCDHEIGHT 64
+#include <Fonts/FreeMono9pt7b.h>
+#define OLED_DC     6
+#define OLED_CS     10
+#define OLED_RESET  5
+Adafruit_SSD1306 display(OLED_DC, OLED_RESET, OLED_CS);
+
+const int JOY_LEFT = 18;
+const int JOY_RIGHT = 17;
+const int JOY_CLICK = 19;
+const int JOY_UP  = 22;
+const int JOY_DOWN = 23;
+
+int poenga = 0;
+int poengb = 0;
+int xb = 140; //initialisering utenfor skjermen
+int wow;
+int a = 20;
+int b = 20;
+double yb = 32;
+double deg = 0.75; //variabel som avgjør hvor mye ballen skal gaa opp/ned i forhold til høyre/venstre
+bool left = false;
+bool right = false;
+int starter;
+int master;
+
+
+static CAN_message_t smsg, msg, rmsg, pmsg, mmsg; //
+IntervalTimer TX_timer;
+
+
+void setup() {
+
+  Can1.begin(500000);
+  Can0.begin(500000);
+
+  pinMode(JOY_LEFT, INPUT_PULLUP);
+  pinMode(JOY_RIGHT, INPUT_PULLUP);
+  pinMode(JOY_CLICK, INPUT_PULLUP);
+  pinMode(JOY_UP, INPUT_PULLUP);
+  pinMode(JOY_DOWN, INPUT_PULLUP);
+
+
+  display.begin(SSD1306_SWITCHCAPVCC);
+  display.clearDisplay();
+  display.setTextSize(0);
+  display.setTextColor(WHITE);
+  display.setCursor(27, 5);
+  display.println("INSTRUKSJONER");
+  display.setCursor(5, 20 );
+  display.drawCircle(61, 20, 1, WHITE);
+  display.println("1. Vent pa plater");
+  display.setCursor(5, 30);
+  display.setTextSize(0);
+  display.println("2. Trykk for master");
+  display.setCursor(5, 40 );
+  display.println("3. Trykk for start");
+  display.display();
+  delay(10000);
+  display.clearDisplay();
+  display.fillCircle(xb, yb, 2, WHITE);
+  display.drawFastVLine(5, a , 20,  WHITE);
+  display.drawFastVLine(123, b , 20, WHITE);
+  display.display();
+  TX_timer.begin(tx_CAN, 1000000);
+}
+void tx_CAN(void)
+{
+  //sett inn en can melding her som sendes når spillet starter
+  smsg.len = 1;
+  smsg.id = 10;
+  smsg.buf[0] = 63;
+
+  mmsg.len = 1;
+  mmsg.id = 5;
+  mmsg.buf[0] = 10;
+}
+
+
+void loop()
+{
+
+  if (Can1.read(rmsg))
+  {
+    master = int(rmsg.buf[0]); //mottak av melding for å bestemme master
+  }
+  else
+  {
+  }
+
+  if (digitalRead(JOY_CLICK) == LOW && xb == 140) //Blir master
+  {
+    xb = 7;
+    Can0.write(mmsg);
+    delay(500);
+    display.fillCircle(xb, yb, 2, WHITE);
+    display.display();
+  }
+  else if (master == 10 && xb == 140)
+  {
+    xb = 121;
+    delay(500);
+    display.fillCircle(xb, yb, 2, WHITE);
+    display.display();
+  }
+  else
+  {
+  }
+
+  wow = int(rmsg.buf[0]); // mottak av melding for å starte
+
+  if (digitalRead(JOY_CLICK) == LOW && xb == 7) //spillet starter
+  {
+    right = true;
+    Can0.write(smsg);
+    rmsg.buf[0] = 0;
+  }
+  else if (wow == 63 && xb == 121)
+  {
+    left = true;
+    rmsg.buf[0] = 0;
+  }
+  else
+  {
+  }
+
+  while (left) //while-løkke som er aktiv når ballen går mot venstre
+  {
+    xb = xb - 1; //endring av x-posisjon
+    yb = yb + deg; //endring y-posisjon
+    if (yb > 62) //ballen snur nå den når bunnen
+    { deg = -deg;
+    }
+    else if (yb < 1) //ballen snur når den når toppen. Disse to kan slås sammen til en if med or
+    {
+      deg = -deg;
+    }
+    else
+    {
+    }
+
+    if (digitalRead(JOY_UP) == LOW && a > 0) //styring av plate
+    {
+      a = a - 1;
+    }
+    else if (digitalRead(JOY_DOWN) == LOW && a < 44)
+    {
+      a = a + 1;
+    }
+    else
+    {
+
+    }
+    //posisjonsmelding som sendes til motstander
+    pmsg.len = 2;
+    pmsg.id = 50;
+    pmsg.buf[1] = a;
+    Can0.write(pmsg);
+
+    if (Can1.read(rmsg)) //mottak av motstanders posisjon
+    {
+      b = int(rmsg.buf[1]);
+    }
+    else
+    {
+    }
+
+    //oppdatering av ball og begge platene på skjerm
+    display.clearDisplay();
+    display.fillCircle(xb, yb, 2, WHITE);
+    display.drawFastVLine(5, a , 20,  WHITE);
+    display.drawFastVLine(123, b , 20, WHITE);
+    display.display();
+    delay(10); //oppdateringsfrekvens på 100Hz
+
+    //påfølgende if-setninger gjør at ballen snur når den når venstresiden. Er plata for lav eller for
+    //høy i forhold til ballen, taper man og motstander får et poeng
+    if (xb == 6)
+    {
+      if (a < yb - 20 || a > yb)
+
+      {
+        left = false;
+        poengb++;
+        display.setCursor(50, 30);
+        display.println("TAPER");
+        display.display();
+        delay(700);
+        display.clearDisplay();
+        display.display();
+        delay(200);
+        display.setCursor(50, 30);
+        display.println("TAPER");
+        display.display();
+        delay(700);
+        display.clearDisplay();
+        display.display();
+        delay(200);
+        display.setCursor(50, 30);
+        display.println("TAPER");
+        display.setCursor(49, 40);
+        display.println(poenga);
+        display.setCursor(62, 40);
+        display.println("-");
+        display.setCursor(75, 40);
+        display.println(poengb);
+        display.display();
+        delay(5000);
+        display.clearDisplay();
+
+        //her nullstilles posisjonen til plater og ball. vinner begynner med ball
+        a = 22;
+        b = 22;
+        xb = 121;
+        yb = 32;
+        display.fillCircle(xb, yb, 2, WHITE);
+        display.drawFastVLine(5, a , 20,  WHITE);
+        display.drawFastVLine(123, b , 20, WHITE);
+        display.display();
+        return loop(); //loop begynner på toppen igjen
+      }
+      else //ballen bare snur dersom man treffer plata.
+      {
+        left = false;
+        right = true;
+      }
+    }
+    else
+
+    {
+    }
+
+  }
+
+  //i denne whileløkken er det meste av innholdet likt som left-løkken. Den største forskjellen er at er at i denne vinner spilleren og får poeng
+  while (right)
+  {
+    xb = xb + 1;
+    yb = yb + deg;
+    if (yb > 62)
+    { deg = -deg;
+    }
+    else if (yb < 1)
+    {
+      deg = -deg;
+    }
+    else
+    {
+    }
+
+    if (digitalRead(JOY_UP) == LOW && a > 0)
+    {
+      a = a - 1;
+    }
+    else if (digitalRead(JOY_DOWN) == LOW && a < 44)
+    {
+      a = a + 1;
+    }
+    else
+    {
+      a = a;
+    }
+
+    pmsg.len = 2;
+    pmsg.id = 50;
+    pmsg.buf[1] = a;
+    Can0.write(pmsg);
+
+    if (Can1.read(rmsg))
+    {
+      b = int(rmsg.buf[1]);
+    }
+    else
+    {
+    }
+
+    display.clearDisplay();
+    display.fillCircle(xb, yb, 2, WHITE);
+    display.drawFastVLine(5, a , 20,  WHITE);
+    display.drawFastVLine(123, b , 20, WHITE);
+    display.display();
+    delay(10);
+
+    if (xb == 122)
+    {
+      if (b > yb || b < yb - 20)
+      {
+        poenga++;
+        right = false;
+        display.setCursor(48, 30);
+        display.println("VINNER");
+        display.display();
+        delay(700);
+        display.clearDisplay();
+        display.display();
+        delay(200);
+        display.setCursor(48, 30);
+        display.println("VINNER");
+        display.display();
+        delay(700);
+        display.clearDisplay();
+        display.display();
+        delay(200);
+        display.setCursor(48, 30);
+        display.println("VINNER");
+        display.setCursor(49, 40);
+        display.println(poenga);
+        display.setCursor(62, 40);
+        display.println("-");
+        display.setCursor(75, 40);
+        display.println(poengb);
+        display.display();
+        delay(5000);
+        display.clearDisplay();
+        a = 22;
+        b = 22;
+        xb = 7;
+        yb = 32;
+        display.fillCircle(xb, yb, 2, WHITE);
+        display.drawFastVLine(5, a , 20,  WHITE);
+        display.drawFastVLine(123, b , 20, WHITE);
+        display.display();
+        return loop(); //starter loop på nytt
+      }
+      else 
+      {
+        left = true;
+        right = false;
+      }
+    }
+    else
+    {
+    }
+  }
+}

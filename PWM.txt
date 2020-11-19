@@ -1,0 +1,42 @@
+    /*
+ * GccApplication1.cpp
+ *
+ * Created: 16.10.2020 09:33:46
+ * Author : sti-b
+ */ 
+ 
+#include <avr/io.h>
+#define F_CPU 1000000UL
+#include <util/delay.h>
+
+
+void pwm_init()
+{
+	TCCR0A |= (1<<WGM01) | (1<<WGM00) | (1<<COM0A1);
+	TCCR0B |= (1<<CS01);
+	
+	DDRD |= (1<<PD6);
+}
+
+int main(void)
+{
+    /* Replace with your application code */
+  uint8_t brightness;
+  
+  pwm_init();
+  
+   while (1)
+   {
+	   for (brightness=0; brightness < 255; ++brightness)
+	   {
+		   OCR0A=brightness;
+		   _delay_ms(10);
+	   }
+	   for (brightness=255; brightness>0; --brightness)
+	   {
+		   OCR0A=brightness;
+		   _delay_ms(10);
+	   }
+	   
+   }
+}
