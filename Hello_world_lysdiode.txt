@@ -1,0 +1,19 @@
+/*
+ * GccApplication2.cpp
+ *
+ * Created: 16.10.2020 10:53:45
+ * Author : sti-b
+ */ 
+
+#include <avr/io.h>
+#define F_CPU 1000000UL
+#include <util/delay.h>
+
+int main(void)
+{
+    while (1) 
+    {
+		DDRC |= 1<<PC5;
+		PORTC |= 1<<PC5;
+    }
+}

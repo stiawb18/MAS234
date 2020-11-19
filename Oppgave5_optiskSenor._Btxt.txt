@@ -1,0 +1,31 @@
+
+#include <Fonts/FreeMono9pt7b.h>
+#define OLED_DC     6
+#define OLED_CS     10
+#define OLED_RESET  5
+Adafruit_SSD1306 display(OLED_DC, OLED_RESET, OLED_CS);
+
+const int JOY_CLICK = 19; //definerer pin-nummer paa klikk
+const int sensor = 1;
+bool a;
+int b;
+
+static CAN_message_t tmsg, fmsg, rmsg;
+IntervalTimer TX_timer;
+
+void setup()
+{
+  Can1.begin(500000);
+  TX_timer.begin(tx_CAN, 1000000);
+}
+void tx_CAN(void)
+{
+}
+
+void loop()
+{
+  while (Can1.read(rmsg))
+    Can1.write(rmsg);
+  delay(10);
+
+}

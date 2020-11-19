@@ -1,0 +1,88 @@
+#include <FlexCAN.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SSD1306_LCDHEIGHT 64
+#include <Fonts/FreeMono9pt7b.h>
+#define OLED_DC     6
+#define OLED_CS     10
+#define OLED_RESET  5
+Adafruit_SSD1306 display(OLED_DC, OLED_RESET, OLED_CS);
+
+const int JOY_CLICK = 19; //definerer pin-nummer paa klikk
+const int sensor = 23;
+bool a;
+int b;
+
+static CAN_message_t tmsg, fmsg, rmsg;
+IntervalTimer TX_timer;
+
+
+void setup() {
+ pinMode(sensor, INPUT_PULLUP);
+Serial.begin(9600);
+  display.begin(SSD1306_SWITCHCAPVCC);
+
+  display.clearDisplay();
+  display.setTextSize(0);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 30);
+  display.println("Sensor leser");
+  display.display();
+
+  Can1.begin(500000);
+
+  TX_timer.begin(tx_CAN, 1000000);
+
+  pinMode(JOY_CLICK, INPUT_PULLUP); //kunfigurerer valgt pin som pullup.
+}
+void tx_CAN(void)
+{
+  tmsg.len = 1;
+  tmsg.id = 10;
+  tmsg.buf[0] = 20;
+
+  fmsg.len = 1;
+  fmsg.id = 10;
+  fmsg.buf[0] = 10;
+}
+
+
+
+void loop() {
+Serial.print(digitalRead(sensor));
+  a = digitalRead(sensor);
+Serial.print(a);
+  if (a == true)
+  {
+    Can1.write(tmsg);
+  }
+  else
+  {
+    Can1.write(fmsg);
+  }
+
+  while (Can1.read(rmsg))
+  {
+    b = rmsg.buf[0];
+
+    if (b == 20)
+    {
+      display.fillRect(85, 30, 40, 20, BLACK);
+      display.setCursor(85, 30);
+      display.println("HIGH");
+      display.display();
+    }
+    else if (b == 10)
+    {
+      display.fillRect(85, 30, 40, 20, BLACK);
+      display.setCursor(85, 30);
+      display.println("LOW");
+      display.display();
+    }
+
+  }
+  delay(10);
+}
+
